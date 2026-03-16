@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+    
+    <title>SOS Alvorada</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 50px 20px; background: #f4f4f4; color: #333; }
+        
+        #start-screen { display: block; }
+        #loading-screen, #error-screen { display: none; }
+        
+        .loader { 
+            border: 10px solid #f3f3f3; 
+            border-top: 10px solid #8e44ad; 
+            border-radius: 50%; width: 50px; height: 50px; 
+            animation: spin 2s linear infinite; margin: 20px auto; 
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .btn-action { 
+            background: #8e44ad; color: white; border: none; 
+            padding: 12px 20px; 
+            border-radius: 8px; font-size: 18px; 
+            cursor: pointer; margin-top: 20px; font-weight: bold; 
+            width: 80%; 
+            max-width: 300px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            transition: background 0.3s;
+        }
+        
+        /* Estilo para quando o botão está desativado (Prevenção de Spam) */
+        .btn-action:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        
+        .btn-retry { background: #c0392b; }
+        
+        h2 { color: #8e44ad; }
+        .alert-icon { font-size: 50px; margin-bottom: 10px; }
+        .instruction-box { text-align: left; background: #fff3f3; padding: 15px; border-radius: 8px; font-size: 14px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <div id="start-screen">
+        <div class="alert-icon">🛡️</div>
+        <h2>Botão Lilás</h2>
+        <p>Ao tocar no botão abaixo, enviaremos sua localização para a central de ajuda.</p>
+        <button id="btn-sos" class="btn-action" onclick="requestLocation()">PEDIR AJUDA AGORA</button>
+    </div>
+
+    <div id="loading-screen" role="status" aria-live="polite">
+        <h2>Acionando Ajuda...</h2>
+        <p>Aguarde, capturando sua localização segura...</p>
+        <div class="loader" aria-label="Carregando localização"></div>
+    </div>
+
+    <div id="error-screen">
+        <div class="alert-icon">⚠️</div>
+        <h2 id="error-title" style="color: #c0392b;">AÇÃO NECESSÁRIA</h2>
+        <p id="error-msg"></p>
+        
+        <div id="step-by-step" class="instruction-box" style="display: none;">
+            <strong>Como permitir agora:</strong><br>
+            1. Toque no ícone de <strong>Cadeado</strong> ou <strong>Configurações</strong> na barra de endereço.<br>
+            2. Ative a opção <strong>"Localização"</strong>.<br>
+            3. Recarregue a página.
+        </div>
+
+        <button id="btn-retry" class="btn-action btn-retry" onclick="resetAndRetry()">TENTAR NOVAMENTE</button>
+    </div>
+
+    <script>
+        // 2. CORREÇÃO: Ofuscação simples do número (Base64)
+        // Isso não é 100% seguro, mas evita que bots de rastreio simples (scrapers) roubem o número de cara.
+        // "NTU1MTMwNDQ4NTI3" é "555130448527" em Base64.
+        const ENCODED_NUMBER = "NTU1MTMwNDQ4NTI3"; 
+        
+        // Variável para prevenir múltiplos cliques (Spam)
+        let isProcessing = false;
+
+        function showScreen(screenId) {
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('loading-screen').style.display = 'none';
+            document.getElementById('error-screen').style.display = 'none';
+            document.getElementById(screenId).style.display = 'block';
+        }
+
+        function requestLocation() {
+            // 3. CORREÇÃO: Prevenção de múltiplos cliques
+            if (isProcessing) return; 
+            isProcessing = true;
+            
+            // Desativa o botão visualmente
+            document.getElementById('btn-sos').disabled = true;
+            showScreen('loading-screen');
+
+            // Verifica se está em ambiente seguro (HTTPS é obrigatório para GPS)
+            if (window.location.protocol !== 'https:' && 
+                window.location.hostname !== 'localhost') {
+                showError("Ambiente inseguro. O sistema de SOS exige conexão HTTPS para proteger sua localização.");
+                return;
+            }
+
+            // 
+            if (!navigator.geolocation) {
+                showError("Seu aparelho ou navegador não suporta GPS.");
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(sendEmergencyAlert, handleLocationError, {
+                enableHighAccuracy: true,
+                timeout: 15000, 
+                maximumAge: 0 
+            });
+        }
+
+        // envia alerta de mensagem
+        function sendEmergencyAlert(position) {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            
+            // 4. CORREÇÃO: URL oficial e segura (HTTPS) do Google Maps
+            // Removido o erro do '1{lat}' e alterado para a rota padrão e criptografada
+            const mapsUrl = `https://maps.google.com/?q=${lat},${lon}`;
+            
+            const messageText = `🚨 *BOTÃO LILÁS - ALVORADA*\n\nESTOU EM PERIGO!\nMinha localização: ${mapsUrl}`;
+            const messageEncoded = encodeURIComponent(messageText);
+            
+            // Decodifica o número na hora de usar
+            const decodedNumber = atob(ENCODED_NUMBER);
+            const whatsappUrl = `https://wa.me/${decodedNumber}?text=${messageEncoded}`;
+            
+            window.location.href = whatsappUrl;
+            
+            // Libera o botão após 5 segundos para evitar spam contínuo
+            setTimeout(() => {
+                isProcessing = false;
+                document.getElementById('btn-sos').disabled = false;
+            }, 5000);
+        }
+
+        // verifica erro
+        function handleLocationError(error) {
+            isProcessing = false; // Libera a trava de processamento
+            document.getElementById('btn-sos').disabled = false; // Reativa o botão
+            showScreen('error-screen');
+            
+            const errorMsgEl = document.getElementById('error-msg');
+            const stepBoxEl = document.getElementById('step-by-step');
+
+            if (error.code === error.PERMISSION_DENIED) {
+                document.getElementById('error-title').innerText = "ACESSO BLOQUEADO";
+                errorMsgEl.innerText = "Você recusou o acesso à localização. Siga os passos abaixo para liberar:";
+                stepBoxEl.style.display = 'block';
+            } else {
+                document.getElementById('error-title').innerText = "SINAL FRACO";
+                errorMsgEl.innerText = "Não conseguimos sinal do GPS a tempo. Verifique se o GPS e a Internet estão ligados ou vá para um local mais aberto.";
+                stepBoxEl.style.display = 'none';
+            }
+        }
+
+        function resetAndRetry() {
+            isProcessing = false;
+            requestLocation();
+        }
+
+        // 5. Função auxiliar para exibir erros customizados
+        function showError(message) {
+            showScreen('error-screen');
+            document.getElementById('error-title').innerText = "ERRO DE SEGURANÇA";
+            document.getElementById('error-msg').innerText = message;
+            document.getElementById('step-by-step').style.display = 'none';
+            isProcessing = false;
+            document.getElementById('btn-sos').disabled = false;
+        }
+    </script>
+</body>
+</html>
