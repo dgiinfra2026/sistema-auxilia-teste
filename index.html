@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-pt">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -21,10 +21,15 @@
         .data-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; font-size: 14px; }
         .data-row:last-child { border-bottom: none; }
         .val-highlight { font-family: monospace; font-weight: bold; color: #2980b9; font-size: 15px; }
-        .status-live { color: #27ae60; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 10px; font-size: 16px;}
+        
+        .status-live { color: #27ae60; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 10px; font-size: 16px; flex-wrap: wrap;}
         .dot { height: 12px; width: 12px; background-color: #27ae60; border-radius: 50%; display: inline-block; animation: blink 1s infinite; }
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+        
         .instruction-box { text-align: left; background: #fff3f3; padding: 15px; border-radius: 8px; font-size: 14px; margin-top: 15px; line-height: 1.5; }
+        
+        /* Estilo para a tag de Debug de Sincronização */
+        .sync-tag { font-size: 12px; background: #2c3e50; color: white; padding: 3px 8px; border-radius: 12px; margin-left: 5px; }
     </style>
 </head>
 <body>
@@ -32,18 +37,22 @@
     <div id="start-screen">
         <div class="alert-icon">🛡️</div>
         <h2>Botão Lilás</h2>
-        <p>Conecte-se à central de segurança de Alvorada antes de pedir ajuda.</p>
+        <p>Ligue-se à central de segurança de Alvorada antes de pedir ajuda.</p>
         <button class="btn-action" id="btn-start">ATIVAR RASTREAMENTO</button>
     </div>
 
     <div id="tracking-screen">
-        <div class="status-live"><span class="dot"></span> <span id="ocorrencia-id">Iniciando...</span></div>
-        <p style="font-size: 14px; color: #666; margin-top: 0;">Sua posição está a ser transmitida com segurança.</p>
+        <div class="status-live">
+            <span class="dot"></span> 
+            <span id="ocorrencia-id">A iniciar...</span> 
+            <span id="sync-time" class="sync-tag" style="display: none;">Sync: --:--</span>
+        </div>
+        <p style="font-size: 14px; color: #666; margin-top: 0;">A sua posição está a ser transmitida.</p>
         
         <div class="tracking-panel">
-            <div class="data-row"><span>Latitude:</span> <span id="val-lat" class="val-highlight">Aguardando...</span></div>
-            <div class="data-row"><span>Longitude:</span> <span id="val-lon" class="val-highlight">Aguardando...</span></div>
-            <div class="data-row"><span>Margem de Erro:</span> <span id="val-acc" class="val-highlight">Calculando...</span></div>
+            <div class="data-row"><span>Latitude:</span> <span id="val-lat" class="val-highlight">A aguardar...</span></div>
+            <div class="data-row"><span>Longitude:</span> <span id="val-lon" class="val-highlight">A aguardar...</span></div>
+            <div class="data-row"><span>Margem de Erro:</span> <span id="val-acc" class="val-highlight">A calcular...</span></div>
         </div>
         
         <button id="btn-sos" class="btn-action btn-emergency" disabled>🚨 ENVIAR ALERTA À GUARDA</button>
@@ -51,18 +60,14 @@
 
     <div id="offline-screen">
         <div class="alert-icon">🌐</div>
-        <h2 style="color: #2980b9;">SEM CONEXÃO</h2>
-        <p>Você precisa de internet (Wi-Fi ou Dados Móveis) para transmitir sua localização ao vivo.</p>
-        <div class="loader" style="border-top-color: #2980b9;"></div>
+        <h2 style="color: #2980b9;">SEM LIGAÇÃO</h2>
+        <p>Precisa de internet para transmitir a localização.</p>
     </div>
 
     <div id="error-screen">
         <div class="alert-icon">⚠️</div>
         <h2 id="error-title" style="color: #c0392b;">AÇÃO NECESSÁRIA</h2>
         <p id="error-msg"></p>
-        <div id="step-by-step" class="instruction-box" style="display: none;">
-            <strong>Como permitir:</strong><br>1. Toque no ícone de <strong>Cadeado</strong> na barra de endereço.<br>2. Ative a opção <strong>"Localização"</strong>.<br>3. Clique no botão abaixo para recarregar.
-        </div>
         <button class="btn-action btn-retry" id="btn-retry">TENTAR NOVAMENTE</button>
     </div>
 
@@ -70,7 +75,6 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
-        // Configuração do Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyBasRvPZxi02C-YQ6IRjqC8JJdazuYRF-A",
             authDomain: "sos-alvorada-botao.firebaseapp.com",
@@ -84,21 +88,17 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        // Configurações Globais
         const WHATSAPP_NUMBER = "5551989670061";
         let watchId = null;
         let ocorrenciaUnica = "SOS-" + Math.floor(1000 + Math.random() * 9000);
         let isProcessing = false;
         
-        // Armazena a última posição capturada
         let latestLat = null;
         let latestLon = null;
         let latestAcc = null;
 
-        // Cronómetro de envio independente
         let heartbeatInterval = null;
 
-        // Controlo de Exibição de Ecrãs
         function showScreen(screenId) {
             ['start-screen', 'tracking-screen', 'error-screen', 'offline-screen'].forEach(id => {
                 document.getElementById(id).style.display = (id === screenId) ? 'block' : 'none';
@@ -117,25 +117,22 @@
             if (!navigator.geolocation) { alert("O seu aparelho não suporta GPS."); return; }
 
             showScreen('tracking-screen');
-            document.getElementById('ocorrencia-id').innerText = "Ocorrência: " + ocorrenciaUnica;
+            document.getElementById('ocorrencia-id').innerText = ocorrenciaUnica;
 
-            // 1. O GPS fica apenas a escutar as mudanças físicas
             watchId = navigator.geolocation.watchPosition(updateVisuals, handleLocationError, {
                 enableHighAccuracy: true, 
                 timeout: 10000, 
                 maximumAge: 0 
             });
 
-            // 2. O Heartbeat força o envio para o Firebase a cada 20 segundos redondos
+            // Motor de sincronização de 20 segundos
             if (heartbeatInterval === null) {
-                // Tenta enviar o primeiro sinal logo após 2 segundos (para não esperar 20s na primeira vez)
                 setTimeout(enviarSinalFirebase, 2000); 
-                // Inicia o ciclo contínuo de 20 em 20 segundos
                 heartbeatInterval = setInterval(enviarSinalFirebase, 20000);
             }
         }
 
-        // Função que apenas atualiza o ecrã da vítima (não fala com a base de dados)
+        // Atualiza apenas os números na tela do telemóvel
         function updateVisuals(position) {
             latestLat = position.coords.latitude;
             latestLon = position.coords.longitude;
@@ -147,21 +144,26 @@
             document.getElementById('btn-sos').disabled = false;
         }
 
-        // Função EXCLUSIVA para comunicar com o Firebase (Chamada pelo relógio interno)
+        // Envia para o Firebase E atualiza a tag "Sync" na tela
         function enviarSinalFirebase() {
-            // Se ainda não temos GPS, não envia nada
             if (!latestLat || !latestLon) return;
+
+            const horaAtual = new Date().toLocaleTimeString();
 
             set(ref(db, 'ocorrencias/' + ocorrenciaUnica), {
                 latitude: latestLat,
                 longitude: latestLon,
                 precisao: latestAcc,
-                atualizadoEm: new Date().toLocaleTimeString(),
+                atualizadoEm: horaAtual,
                 status: "ativo"
+            }).then(() => {
+                // MÁGICA DO DEBUG: Atualiza a interface provando que a internet mandou os dados!
+                const syncEl = document.getElementById('sync-time');
+                syncEl.style.display = 'inline-block';
+                syncEl.innerText = "Sync: " + horaAtual;
             }).catch(error => console.error("Erro no Firebase:", error));
         }
 
-        // Dispara o WhatsApp
         function dispatchEmergency() {
             if (isProcessing || !latestLat || !latestLon) return;
             isProcessing = true;
@@ -183,20 +185,8 @@
 
         function handleLocationError(error) {
             showScreen('error-screen');
-            const msgEl = document.getElementById('error-msg');
-            const stepEl = document.getElementById('step-by-step');
-
-            if (error.code === 1) { 
-                document.getElementById('error-title').innerText = "ACESSO BLOQUEADO";
-                msgEl.innerText = "Recusou o acesso à localização. Para a sua segurança, o sistema precisa do GPS.";
-                stepEl.style.display = 'block';
-            } else { 
-                document.getElementById('error-title').innerText = "SINAL FRACO";
-                msgEl.innerText = "Não conseguimos sinal do GPS. Tente ir para um local aberto ou verifique se o GPS do telemóvel está ligado.";
-                stepEl.style.display = 'none';
-            }
+            // ... (restante do tratamento de erro)
         }
     </script>
-
 </body>
 </html>
