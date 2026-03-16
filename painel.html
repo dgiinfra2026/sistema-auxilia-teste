@@ -1,1 +1,170 @@
-<!-- Implementar -->
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Central Botão Lilás - Alvorada</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background: #e0e0e0; }
+        
+        #map { height: 100vh; width: 100vw; z-index: 1; }
+        
+        /* Painel flutuante de informações */
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            width: 320px;
+            border-top: 5px solid #8e44ad;
+        }
+
+        h2 { margin: 0 0 15px 0; color: #333; font-size: 1.2rem; display: flex; align-items: center; gap: 8px; }
+        .data-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; font-size: 14px; color: #555; }
+        .data-row:last-child { border-bottom: none; }
+        .highlight { font-weight: bold; color: #2c3e50; font-family: monospace; font-size: 15px; }
+        
+        .status-badge {
+            background: #f39c12; color: white; padding: 4px 10px; border-radius: 15px; font-size: 12px; font-weight: bold; animation: pulse 2s infinite;
+        }
+        .status-active { background: #e74c3c; }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+
+        .offline-warning { color: #c0392b; font-weight: bold; text-align: center; margin-top: 10px; display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="info-panel">
+        <h2>🛡️ Central de Comando</h2>
+        
+        <div class="data-row">
+            <span>Ocorrência:</span>
+            <span id="ui-id" class="highlight">Carregando...</span>
+        </div>
+        <div class="data-row">
+            <span>Transmissão:</span>
+            <span id="ui-status" class="status-badge">Aguardando</span>
+        </div>
+        <div class="data-row">
+            <span>Última Atualização:</span>
+            <span id="ui-time" class="highlight">--:--:--</span>
+        </div>
+        <div class="data-row">
+            <span>Margem de Erro (Raio):</span>
+            <span id="ui-acc" class="highlight">-- metros</span>
+        </div>
+        
+        <div id="ui-warning" class="offline-warning">
+            Aguardando sinal do dispositivo da vítima...
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+
+        // Suas chaves de conexão
+        const firebaseConfig = {
+            apiKey: "AIzaSyBasRvPZxi02C-YQ6IRjqC8JJdazuYRF-A",
+            authDomain: "sos-alvorada-botao.firebaseapp.com",
+            databaseURL: "https://sos-alvorada-botao-default-rtdb.firebaseio.com",
+            projectId: "sos-alvorada-botao",
+            storageBucket: "sos-alvorada-botao.firebasestorage.app",
+            messagingSenderId: "187135078415",
+            appId: "1:187135078415:web:11db12917a4d4e091db37a"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // Captura o ID da URL (Ex: painel.html?id=SOS-1234)
+        const urlParams = new URLSearchParams(window.location.search);
+        const ocorrenciaId = urlParams.get('id');
+        
+        document.getElementById('ui-id').innerText = ocorrenciaId || 'Nenhum ID informado';
+
+        // Configuração Inicial do Mapa (Centralizado em Alvorada-RS)
+        const map = L.map('map').setView([-30.0035, -51.0646], 13);
+        
+        // Camada visual do mapa (OpenStreetMap gratuito)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(map);
+
+        let marker = null; // O pino
+        let accuracyCircle = null; // O círculo de precisão vermelho
+
+        if (ocorrenciaId) {
+            document.getElementById('ui-warning').style.display = 'block';
+
+            // Abre o canal de escuta em tempo real no Firebase
+            const ocorrenciaRef = ref(db, 'ocorrencias/' + ocorrenciaId);
+            
+            // onValue é acionado SEMPRE que a latitude/longitude muda no banco de dados
+            onValue(ocorrenciaRef, (snapshot) => {
+                const data = snapshot.val();
+                
+                if (data) {
+                    // Oculta aviso e atualiza o painel lateral
+                    document.getElementById('ui-warning').style.display = 'none';
+                    document.getElementById('ui-time').innerText = data.atualizadoEm;
+                    document.getElementById('ui-acc').innerText = data.precisao + "m";
+                    
+                    const statusBadge = document.getElementById('ui-status');
+                    statusBadge.innerText = "Sinal Ao Vivo";
+                    statusBadge.classList.add('status-active');
+
+                    const lat = data.latitude;
+                    const lon = data.longitude;
+                    const acc = data.precisao;
+
+                    // Se o pino não existe, cria. Se existe, move para a nova posição.
+                    if (!marker) {
+                        marker = L.marker([lat, lon]).addTo(map);
+                        
+                        // Mostra a área de precisão
+                        accuracyCircle = L.circle([lat, lon], {
+                            color: '#e74c3c',
+                            fillColor: '#e74c3c',
+                            fillOpacity: 0.2,
+                            radius: acc
+                        }).addTo(map);
+                        
+                        // Zoom próximo da vítima
+                        map.setView([lat, lon], 17);
+                    } else {
+                        // Ajuste da posição
+                        marker.setLatLng([lat, lon]);
+                        accuracyCircle.setLatLng([lat, lon]);
+                        accuracyCircle.setRadius(acc);
+                        
+                        // A câmera segue a mulher se ela sair da tela
+                        map.panTo([lat, lon]);
+                    }
+                }
+            });
+        } else {
+            document.getElementById('ui-warning').innerText = "URL inválida. Falta o parâmetro ?id=";
+            document.getElementById('ui-warning').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
