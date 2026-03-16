@@ -180,11 +180,11 @@
             // Link do Painel da Guarda (Ajuste a URL se mudar o repositório)
             const painelUrl = `https://dgiinfra2026.github.io/sistema-auxiliar/painel.html?id=${ocorrenciaUnica}`;
             
-            // Mensagem atualizada: agora possui a Coordenada Estática + Painel Dinâmico
+            // Mensagem com Coordenada Estática + Painel Dinâmico
             const messageText = `🚨 *ALERTA BOTÃO LILÁS*\n\nOcorrência: *${ocorrenciaUnica}*\nESTOU EM PERIGO!\n\n📍 *Localização no momento do alerta:*\n${mapsUrl}\n\n🛰️ *Acompanhe meu movimento ao vivo no painel:*\n${painelUrl}`;
             
-            // Envia direto pro número limpo
-            window.location.href = `whatsapp://send?phone=${WHATSAPP_NUMBER}&text=${encodeURIComponent(messageText)}`;
+            // REDIRECIONAMENTO ALTERADO: Usando o link oficial wa.me
+            window.location.href = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(messageText)}`;
             
             // Restaura o botão após 5 segundos
             setTimeout(() => { 
