@@ -86,7 +86,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
-        // Configuração do Firebase (Chaves da Prefeitura)
+        // Configuração do Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyBasRvPZxi02C-YQ6IRjqC8JJdazuYRF-A",
             authDomain: "sos-alvorada-botao.firebaseapp.com",
@@ -101,10 +101,14 @@
         const db = getDatabase(app);
 
         // Configurações Globais
-        const ENCODED_NUMBER = "NTE5ODk2NzAwNjE=" // "NTU1MTMwNDQ4NTI3"; // Número do WhatsApp codificado
+        const WHATSAPP_NUMBER = "5551989670061"; // Número direto e limpo da Guarda
         let watchId = null;
         let ocorrenciaUnica = "SOS-" + Math.floor(1000 + Math.random() * 9000);
         let isProcessing = false;
+        
+        // Armazena a última posição capturada
+        let latestLat = null;
+        let latestLon = null;
 
         // Controle de Exibição de Telas
         function showScreen(screenId) {
@@ -143,20 +147,20 @@
 
         // Atualiza Tela e Banco de Dados
         function updateLocation(position) {
-            const lat = position.coords.latitude;
-            const lon = position.coords.longitude;
+            latestLat = position.coords.latitude;
+            latestLon = position.coords.longitude;
             const acc = position.coords.accuracy.toFixed(0);
 
             // Atualiza Interface Visual
-            document.getElementById('val-lat').innerText = lat.toFixed(6);
-            document.getElementById('val-lon').innerText = lon.toFixed(6);
+            document.getElementById('val-lat').innerText = latestLat.toFixed(6);
+            document.getElementById('val-lon').innerText = latestLon.toFixed(6);
             document.getElementById('val-acc').innerText = acc + " metros";
             document.getElementById('btn-sos').disabled = false;
 
             // Envia para o Firebase (Motor Realtime)
             set(ref(db, 'ocorrencias/' + ocorrenciaUnica), {
-                latitude: lat,
-                longitude: lon,
+                latitude: latestLat,
+                longitude: latestLon,
                 precisao: acc,
                 atualizadoEm: new Date().toLocaleTimeString(),
                 status: "ativo"
@@ -165,18 +169,22 @@
 
         // Dispara o WhatsApp
         function dispatchEmergency() {
-            if (isProcessing) return;
+            if (isProcessing || !latestLat || !latestLon) return;
             isProcessing = true;
             document.getElementById('btn-sos').disabled = true;
             document.getElementById('btn-sos').innerText = "ENVIANDO ALERTA...";
 
+            // Link do mapa exato capturado no momento do clique
+            const mapsUrl = `http://googleusercontent.com/maps.google.com/?q=${latestLat},${latestLon}`;
+            
             // Link do Painel da Guarda (Ajuste a URL se mudar o repositório)
             const painelUrl = `https://dgiinfra2026.github.io/sistema-auxiliar/painel.html?id=${ocorrenciaUnica}`;
             
-            const messageText = `🚨 *ALERTA BOTÃO LILÁS*\n\nOcorrência: *${ocorrenciaUnica}*\nESTOU EM PERIGO!\n\nAcompanhe meu deslocamento em tempo real no painel oficial da Guarda:\n${painelUrl}`;
+            // Mensagem atualizada: agora possui a Coordenada Estática + Painel Dinâmico
+            const messageText = `🚨 *ALERTA BOTÃO LILÁS*\n\nOcorrência: *${ocorrenciaUnica}*\nESTOU EM PERIGO!\n\n📍 *Localização no momento do alerta:*\n${mapsUrl}\n\n🛰️ *Acompanhe meu movimento ao vivo no painel:*\n${painelUrl}`;
             
-            const decodedNumber = atob(ENCODED_NUMBER);
-            window.location.href = `whatsapp://send?phone=${decodedNumber}&text=${encodeURIComponent(messageText)}`;
+            // Envia direto pro número limpo
+            window.location.href = `whatsapp://send?phone=${WHATSAPP_NUMBER}&text=${encodeURIComponent(messageText)}`;
             
             // Restaura o botão após 5 segundos
             setTimeout(() => { 
