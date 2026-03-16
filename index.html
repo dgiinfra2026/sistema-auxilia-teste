@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-pt">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,7 +7,7 @@
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; padding: 30px 20px; background: #f4f4f4; color: #333; margin: 0; }
         
-        /* Telas */
+        /* Ecrãs */
         #start-screen, #tracking-screen, #error-screen, #offline-screen { display: none; }
         #start-screen { display: block; }
         
@@ -45,18 +45,18 @@
     <div id="start-screen">
         <div class="alert-icon">🛡️</div>
         <h2>Botão Lilás</h2>
-        <p>Conecte-se à central de segurança de Alvorada antes de pedir ajuda.</p>
+        <p>Ligue-se à central de segurança de Alvorada antes de pedir ajuda.</p>
         <button class="btn-action" id="btn-start">ATIVAR RASTREAMENTO</button>
     </div>
 
     <div id="tracking-screen">
-        <div class="status-live"><span class="dot"></span> <span id="ocorrencia-id">Iniciando...</span></div>
-        <p style="font-size: 14px; color: #666; margin-top: 0;">Sua posição está sendo transmitida com segurança.</p>
+        <div class="status-live"><span class="dot"></span> <span id="ocorrencia-id">A iniciar...</span></div>
+        <p style="font-size: 14px; color: #666; margin-top: 0;">A sua posição está a ser transmitida com segurança.</p>
         
         <div class="tracking-panel">
-            <div class="data-row"><span>Latitude:</span> <span id="val-lat" class="val-highlight">Aguardando...</span></div>
-            <div class="data-row"><span>Longitude:</span> <span id="val-lon" class="val-highlight">Aguardando...</span></div>
-            <div class="data-row"><span>Margem de Erro:</span> <span id="val-acc" class="val-highlight">Calculando...</span></div>
+            <div class="data-row"><span>Latitude:</span> <span id="val-lat" class="val-highlight">A aguardar...</span></div>
+            <div class="data-row"><span>Longitude:</span> <span id="val-lon" class="val-highlight">A aguardar...</span></div>
+            <div class="data-row"><span>Margem de Erro:</span> <span id="val-acc" class="val-highlight">A calcular...</span></div>
         </div>
         
         <button id="btn-sos" class="btn-action btn-emergency" disabled>🚨 ENVIAR ALERTA À GUARDA</button>
@@ -64,8 +64,8 @@
 
     <div id="offline-screen">
         <div class="alert-icon">🌐</div>
-        <h2 style="color: #2980b9;">SEM CONEXÃO</h2>
-        <p>Você precisa de internet (Wi-Fi ou Dados Móveis) para transmitir sua localização ao vivo.</p>
+        <h2 style="color: #2980b9;">SEM LIGAÇÃO</h2>
+        <p>Precisa de internet (Wi-Fi ou Dados Móveis) para transmitir a sua localização em tempo real.</p>
         <div class="loader" style="border-top-color: #2980b9;"></div>
     </div>
 
@@ -75,9 +75,9 @@
         <p id="error-msg"></p>
         <div id="step-by-step" class="instruction-box" style="display: none;">
             <strong>Como permitir:</strong><br>
-            1. Toque no ícone de <strong>Cadeado</strong> na barra de endereço.<br>
+            1. Toque no ícone do <strong>Cadeado</strong> na barra de endereço.<br>
             2. Ative a opção <strong>"Localização"</strong>.<br>
-            3. Clique no botão abaixo para recarregar.
+            3. Clique no botão abaixo para recarregar a página.
         </div>
         <button class="btn-action btn-retry" id="btn-retry">TENTAR NOVAMENTE</button>
     </div>
@@ -101,7 +101,7 @@
         const db = getDatabase(app);
 
         // Configurações Globais
-        const WHATSAPP_NUMBER = "5551989670061"; // Número direto e limpo da Guarda
+        const WHATSAPP_NUMBER = "5551989670061"; // Número direto e limpo
         let watchId = null;
         let ocorrenciaUnica = "SOS-" + Math.floor(1000 + Math.random() * 9000);
         let isProcessing = false;
@@ -110,14 +110,18 @@
         let latestLat = null;
         let latestLon = null;
 
-        // Controle de Exibição de Telas
+        // Controlo de tempo para envio (20 segundos) para otimização
+        let ultimaAtualizacaoFirebase = 0; 
+        const INTERVALO_ATUALIZACAO_MS = 20000;
+
+        // Controlo de Exibição de Ecrãs
         function showScreen(screenId) {
             ['start-screen', 'tracking-screen', 'error-screen', 'offline-screen'].forEach(id => {
                 document.getElementById(id).style.display = (id === screenId) ? 'block' : 'none';
             });
         }
 
-        // Monitor de Conexão (Online/Offline)
+        // Monitor de Ligação (Online/Offline)
         window.addEventListener('offline', () => {
             if (watchId !== null) showScreen('offline-screen');
         });
@@ -133,7 +137,7 @@
         // Inicia captura de GPS
         function startTracking() {
             if (!navigator.onLine) { showScreen('offline-screen'); return; }
-            if (!navigator.geolocation) { alert("Seu aparelho não suporta GPS."); return; }
+            if (!navigator.geolocation) { alert("O seu aparelho não suporta GPS."); return; }
 
             showScreen('tracking-screen');
             document.getElementById('ocorrencia-id').innerText = "Ocorrência: " + ocorrenciaUnica;
@@ -145,26 +149,32 @@
             });
         }
 
-        // Atualiza Tela e Banco de Dados
+        // Atualiza Ecrã e Base de Dados
         function updateLocation(position) {
             latestLat = position.coords.latitude;
             latestLon = position.coords.longitude;
             const acc = position.coords.accuracy.toFixed(0);
 
-            // Atualiza Interface Visual
+            // 1. Atualiza a interface visual IMEDIATAMENTE a cada movimento
             document.getElementById('val-lat').innerText = latestLat.toFixed(6);
             document.getElementById('val-lon').innerText = latestLon.toFixed(6);
             document.getElementById('val-acc').innerText = acc + " metros";
             document.getElementById('btn-sos').disabled = false;
 
-            // Envia para o Firebase (Motor Realtime)
-            set(ref(db, 'ocorrencias/' + ocorrenciaUnica), {
-                latitude: latestLat,
-                longitude: latestLon,
-                precisao: acc,
-                atualizadoEm: new Date().toLocaleTimeString(),
-                status: "ativo"
-            }).catch(error => console.error("Erro no Firebase:", error));
+            const agora = Date.now();
+            
+            // 2. Envia para o Firebase APENAS a cada 20 segundos
+            if (agora - ultimaAtualizacaoFirebase >= INTERVALO_ATUALIZACAO_MS) {
+                ultimaAtualizacaoFirebase = agora;
+                
+                set(ref(db, 'ocorrencias/' + ocorrenciaUnica), {
+                    latitude: latestLat,
+                    longitude: latestLon,
+                    precisao: acc,
+                    atualizadoEm: new Date().toLocaleTimeString(),
+                    status: "ativo"
+                }).catch(error => console.error("Erro no Firebase:", error));
+            }
         }
 
         // Dispara o WhatsApp
@@ -172,18 +182,18 @@
             if (isProcessing || !latestLat || !latestLon) return;
             isProcessing = true;
             document.getElementById('btn-sos').disabled = true;
-            document.getElementById('btn-sos').innerText = "ENVIANDO ALERTA...";
+            document.getElementById('btn-sos').innerText = "A ENVIAR ALERTA...";
 
             // Link do mapa exato capturado no momento do clique
             const mapsUrl = `http://googleusercontent.com/maps.google.com/?q=${latestLat},${latestLon}`;
             
-            // Link do Painel da Guarda (Ajuste a URL se mudar o repositório)
+            // Link do Painel da Guarda (Atualizado para o repositório sistema-auxilia-teste)
             const painelUrl = `https://dgiinfra2026.github.io/sistema-auxilia-teste/painel.html?id=${ocorrenciaUnica}`;
             
             // Mensagem com Coordenada Estática + Painel Dinâmico
-            const messageText = `🚨 *ALERTA BOTÃO LILÁS*\n\nOcorrência: *${ocorrenciaUnica}*\nESTOU EM PERIGO!\n\n📍 *Localização no momento do alerta:*\n${mapsUrl}\n\n🛰️ *Acompanhe meu movimento ao vivo no painel:*\n${painelUrl}`;
+            const messageText = `🚨 *ALERTA BOTÃO LILÁS*\n\nOcorrência: *${ocorrenciaUnica}*\nESTOU EM PERIGO!\n\n📍 *Localização no momento do alerta:*\n${mapsUrl}\n\n🛰️ *Acompanhe o meu movimento ao vivo no painel:*\n${painelUrl}`;
             
-            // REDIRECIONAMENTO ALTERADO: Usando o link oficial wa.me
+            // Redirecionamento através de wa.me
             window.location.href = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(messageText)}`;
             
             // Restaura o botão após 5 segundos
@@ -202,11 +212,11 @@
 
             if (error.code === 1) { // Permissão Negada
                 document.getElementById('error-title').innerText = "ACESSO BLOQUEADO";
-                msgEl.innerText = "Você recusou o acesso à localização. Para sua segurança, o sistema precisa do GPS.";
+                msgEl.innerText = "Recusou o acesso à localização. Para a sua segurança, o sistema precisa do GPS.";
                 stepEl.style.display = 'block';
             } else { // Timeout ou Sem Sinal
                 document.getElementById('error-title').innerText = "SINAL FRACO";
-                msgEl.innerText = "Não conseguimos sinal do GPS. Tente ir para um local aberto ou verifique se o GPS do celular está ligado.";
+                msgEl.innerText = "Não conseguimos sinal do GPS. Tente ir para um local aberto ou verifique se o GPS do telemóvel está ligado.";
                 stepEl.style.display = 'none';
             }
         }
