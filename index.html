@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-pt">
+<html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,31 +8,41 @@
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; padding: 30px 20px; background: #f4f4f4; color: #333; margin: 0; }
         #start-screen, #tracking-screen, #error-screen, #offline-screen { display: none; }
         #start-screen { display: block; }
-        .loader { border: 6px solid #f3f3f3; border-top: 6px solid #8e44ad; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 15px auto; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .btn-action { background: #8e44ad; color: white; border: none; padding: 16px 20px; border-radius: 8px; font-size: 18px; cursor: pointer; margin-top: 20px; font-weight: bold; width: 100%; max-width: 350px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); transition: background 0.3s; }
+        
+        .btn-action { background: #8e44ad; color: white; border: none; padding: 16px 20px; border-radius: 8px; font-size: 18px; cursor: pointer; margin-top: 20px; font-weight: bold; width: 100%; max-width: 350px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
         .btn-action:disabled { background: #95a5a6; cursor: not-allowed; box-shadow: none; }
         .btn-emergency { background: #c0392b; animation: pulse 2s infinite; }
         @keyframes pulse { 0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(192, 57, 43, 0.7); } 70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(192, 57, 43, 0); } 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(192, 57, 43, 0); } }
-        .btn-retry { background: #e67e22; }
-        h2 { color: #8e44ad; margin-bottom: 5px; font-size: 24px; }
+        
         .alert-icon { font-size: 55px; margin-bottom: 10px; }
         .tracking-panel { background: white; border-radius: 10px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin: 20px auto; max-width: 350px; text-align: left; }
         .data-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; font-size: 14px; }
-        .data-row:last-child { border-bottom: none; }
         .val-highlight { font-family: monospace; font-weight: bold; color: #2980b9; font-size: 15px; }
         
         .status-live { color: #27ae60; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 10px; font-size: 16px; flex-wrap: wrap;}
         .dot { height: 12px; width: 12px; background-color: #27ae60; border-radius: 50%; display: inline-block; animation: blink 1s infinite; }
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
-        
-        .instruction-box { text-align: left; background: #fff3f3; padding: 15px; border-radius: 8px; font-size: 14px; margin-top: 15px; line-height: 1.5; }
-        
-        /* Estilo para a tag de Debug de Sincronização */
         .sync-tag { font-size: 12px; background: #2c3e50; color: white; padding: 3px 8px; border-radius: 12px; margin-left: 5px; }
+
+        /* TELA DE BLOQUEIO DE GPS */
+        #gps-blocker { 
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(192, 57, 43, 0.98); z-index: 9999; color: white; 
+            flex-direction: column; justify-content: center; align-items: center; 
+            padding: 30px; text-align: center; box-sizing: border-box; backdrop-filter: blur(5px);
+        }
+        .btn-gps-check { background: white; color: #c0392b; border: none; padding: 18px 30px; font-size: 18px; font-weight: bold; border-radius: 8px; cursor: pointer; width: 100%; max-width: 300px; margin-top: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);}
     </style>
 </head>
 <body>
+
+    <div id="gps-blocker">
+        <div style="font-size: 70px; margin-bottom: 10px;">📍</div>
+        <h1 style="margin-top: 0; font-size: 28px;">SINAL PERDIDO</h1>
+        <p style="font-size: 18px; margin-bottom: 10px; line-height: 1.5;">O aplicativo não consegue aceder ao seu GPS. Para a sua segurança, a localização precisa estar ativa.</p>
+        <p style="font-size: 16px; margin-bottom: 30px; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px;"><strong>PASSO A PASSO:</strong><br>1. Puxe a barra superior do telemóvel.<br>2. Ligue o ícone de "Localização" ou "GPS".<br>3. Clique no botão abaixo.</p>
+        <button class="btn-gps-check" id="btn-check-gps">JÁ LIGUEI O GPS</button>
+    </div>
 
     <div id="start-screen">
         <div class="alert-icon">🛡️</div>
@@ -47,7 +57,7 @@
             <span id="ocorrencia-id">A iniciar...</span> 
             <span id="sync-time" class="sync-tag" style="display: none;">Sync: --:--</span>
         </div>
-        <p style="font-size: 14px; color: #666; margin-top: 0;">A sua posição está a ser transmitida.</p>
+        <p style="font-size: 14px; color: #666; margin-top: 0;">Posição transmitida em segundo plano.</p>
         
         <div class="tracking-panel">
             <div class="data-row"><span>Latitude:</span> <span id="val-lat" class="val-highlight">A aguardar...</span></div>
@@ -64,17 +74,17 @@
         <p>Precisa de internet para transmitir a localização.</p>
     </div>
 
-    <div id="error-screen">
-        <div class="alert-icon">⚠️</div>
-        <h2 id="error-title" style="color: #c0392b;">AÇÃO NECESSÁRIA</h2>
-        <p id="error-msg"></p>
-        <button class="btn-action btn-retry" id="btn-retry">TENTAR NOVAMENTE</button>
-    </div>
-
     <script type="module">
+        // 1. Trazendo o Firebase Oficial de volta (Ele fura o bloqueio do CORS)
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+        
+        // 2. Plugins Nativos
+        import { registerPlugin } from '@capacitor/core';
+        import { Geolocation } from '@capacitor/geolocation';
+        const BackgroundGeolocation = registerPlugin('BackgroundGeolocation');
 
+        // 3. Configuração do Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyBasRvPZxi02C-YQ6IRjqC8JJdazuYRF-A",
             authDomain: "sos-alvorada-botao.firebaseapp.com",
@@ -89,7 +99,8 @@
         const db = getDatabase(app);
 
         const WHATSAPP_NUMBER = "5551989670061";
-        let watchId = null;
+        
+        let watcherId = null;
         let ocorrenciaUnica = "SOS-" + Math.floor(1000 + Math.random() * 9000);
         let isProcessing = false;
         
@@ -97,59 +108,84 @@
         let latestLon = null;
         let latestAcc = null;
 
-        let heartbeatInterval = null;
-
         function showScreen(screenId) {
-            ['start-screen', 'tracking-screen', 'error-screen', 'offline-screen'].forEach(id => {
+            ['start-screen', 'tracking-screen', 'offline-screen'].forEach(id => {
                 document.getElementById(id).style.display = (id === screenId) ? 'block' : 'none';
             });
         }
 
-        window.addEventListener('offline', () => { if (watchId !== null) showScreen('offline-screen'); });
+        window.addEventListener('offline', () => { if (watcherId !== null) showScreen('offline-screen'); });
         window.addEventListener('online', () => { if(document.getElementById('offline-screen').style.display === 'block') startTracking(); });
 
         document.getElementById('btn-start').addEventListener('click', startTracking);
-        document.getElementById('btn-retry').addEventListener('click', startTracking);
         document.getElementById('btn-sos').addEventListener('click', dispatchEmergency);
+        
+        document.getElementById('btn-check-gps').addEventListener('click', async () => {
+            try {
+                await Geolocation.getCurrentPosition({ timeout: 5000, maximumAge: 0 });
+                document.getElementById('gps-blocker').style.display = 'none'; 
+                if (!watcherId) startTracking(); 
+            } catch (err) {
+                alert("O GPS continua desligado. Por favor, ative-o na barra de notificações.");
+            }
+        });
 
-        function startTracking() {
+        async function startTracking() {
             if (!navigator.onLine) { showScreen('offline-screen'); return; }
-            if (!navigator.geolocation) { alert("O seu aparelho não suporta GPS."); return; }
+
+            try {
+                await Geolocation.getCurrentPosition({ timeout: 5000 });
+                document.getElementById('gps-blocker').style.display = 'none';
+            } catch (err) {
+                document.getElementById('gps-blocker').style.display = 'flex';
+                return;
+            }
 
             showScreen('tracking-screen');
             document.getElementById('ocorrencia-id').innerText = ocorrenciaUnica;
 
-            watchId = navigator.geolocation.watchPosition(updateVisuals, handleLocationError, {
-                enableHighAccuracy: true, 
-                timeout: 10000, 
-                maximumAge: 0 
-            });
+            try {
+                watcherId = await BackgroundGeolocation.addWatcher(
+                    {
+                        backgroundMessage: "A transmitir localização em segundo plano.",
+                        backgroundTitle: "Botão Lilás Ativo",
+                        requestPermissions: true, 
+                        stale: false,
+                        distanceFilter: 5 // A cada 5 metros
+                    },
+                    function callback(location, error) {
+                        if (error) {
+                            console.error("Erro no GPS Nativo:", error);
+                            document.getElementById('gps-blocker').style.display = 'flex'; 
+                            return;
+                        }
 
-            // Motor de sincronização de 20 segundos
-            if (heartbeatInterval === null) {
-                setTimeout(enviarSinalFirebase, 2000); 
-                heartbeatInterval = setInterval(enviarSinalFirebase, 20000);
+                        document.getElementById('gps-blocker').style.display = 'none';
+
+                        latestLat = location.latitude;
+                        latestLon = location.longitude;
+                        latestAcc = location.accuracy.toFixed(0);
+
+                        document.getElementById('val-lat').innerText = latestLat.toFixed(6);
+                        document.getElementById('val-lon').innerText = latestLon.toFixed(6);
+                        document.getElementById('val-acc').innerText = latestAcc + " metros";
+                        document.getElementById('btn-sos').disabled = false;
+
+                        // Motor Oficial do Firebase (Imune ao bloqueio de CORS)
+                        enviarSinalFirebase();
+                    }
+                );
+            } catch (err) {
+                console.error("Erro ao iniciar rastreio:", err);
+                document.getElementById('gps-blocker').style.display = 'flex';
             }
         }
 
-        // Atualiza apenas os números na tela do telemóvel
-        function updateVisuals(position) {
-            latestLat = position.coords.latitude;
-            latestLon = position.coords.longitude;
-            latestAcc = position.coords.accuracy.toFixed(0);
-
-            document.getElementById('val-lat').innerText = latestLat.toFixed(6);
-            document.getElementById('val-lon').innerText = latestLon.toFixed(6);
-            document.getElementById('val-acc').innerText = latestAcc + " metros";
-            document.getElementById('btn-sos').disabled = false;
-        }
-
-        // Envia para o Firebase E atualiza a tag "Sync" na tela
         function enviarSinalFirebase() {
             if (!latestLat || !latestLon) return;
 
             const horaAtual = new Date().toLocaleTimeString();
-
+            
             set(ref(db, 'ocorrencias/' + ocorrenciaUnica), {
                 latitude: latestLat,
                 longitude: latestLon,
@@ -157,10 +193,11 @@
                 atualizadoEm: horaAtual,
                 status: "ativo"
             }).then(() => {
-                // MÁGICA DO DEBUG: Atualiza a interface provando que a internet mandou os dados!
                 const syncEl = document.getElementById('sync-time');
-                syncEl.style.display = 'inline-block';
-                syncEl.innerText = "Sync: " + horaAtual;
+                if (syncEl) {
+                    syncEl.style.display = 'inline-block';
+                    syncEl.innerText = "Sync: " + horaAtual;
+                }
             }).catch(error => console.error("Erro no Firebase:", error));
         }
 
@@ -170,9 +207,8 @@
             document.getElementById('btn-sos').disabled = true;
             document.getElementById('btn-sos').innerText = "A ENVIAR ALERTA...";
 
-            const mapsUrl = `http://googleusercontent.com/maps.google.com/?q=${latestLat},${latestLon}`;
-            const painelUrl = `https://dgiinfra2026.github.io/sistema-auxilia-teste/painel.html?id=${ocorrenciaUnica}`;
-            const messageText = `🚨 *ALERTA BOTÃO LILÁS*\n\nOcorrência: *${ocorrenciaUnica}*\nESTOU EM PERIGO!\n\n📍 *Localização no momento do alerta:*\n${mapsUrl}\n\n🛰️ *Acompanhe o meu movimento ao vivo no painel:*\n${painelUrl}`;
+            const mapsUrl = `https://www.google.com/maps?q=${latestLat},${latestLon}`;            
+            const messageText = `🚨 *ALERTA BOTÃO LILÁS*\n\nOcorrência: *${ocorrenciaUnica}*\nESTOU EM PERIGO!\n\n📍 *Localização no momento do alerta:*\n${mapsUrl}`;
             
             window.location.href = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(messageText)}`;
             
@@ -181,11 +217,6 @@
                 document.getElementById('btn-sos').disabled = false;
                 document.getElementById('btn-sos').innerText = "🚨 ENVIAR ALERTA À GUARDA";
             }, 5000);
-        }
-
-        function handleLocationError(error) {
-            showScreen('error-screen');
-            // ... (restante do tratamento de erro)
         }
     </script>
 </body>
