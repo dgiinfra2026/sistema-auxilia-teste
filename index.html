@@ -209,7 +209,11 @@
             const mapsUrl = `https://www.google.com/maps?q=${latestLat},${latestLon}`;
             const messageText = `🚨 *ALERTA BOTÃO LILÁS*\n\nOcorrência: *${ocorrenciaUnica}*\nESTOU EM PERIGO!\n\n📍 *Localização no momento do alerta:*\n${mapsUrl}`;
             
-            window.location.href = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(messageText)}`;
+            const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(messageText)}`;
+            
+            // A MUDANÇA CRÍTICA: Abre o link no navegador nativo/app do WhatsApp, 
+            // sem destruir a nossa página index.html
+            window.open(whatsappUrl, '_blank');
             
             setTimeout(() => { 
                 isProcessing = false; 
