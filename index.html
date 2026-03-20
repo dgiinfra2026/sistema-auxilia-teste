@@ -75,29 +75,13 @@
     </div>
 
     <script type="module">
-        // 1. Trazendo o Firebase Oficial de volta (Ele fura o bloqueio do CORS)
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
-        
-        // 2. Plugins Nativos
-        import { registerPlugin } from '@capacitor/core';
+        // 1. Importação da Ponte Nativa HTTP (A grande mudança!)
+        import { registerPlugin, CapacitorHttp } from '@capacitor/core';
         import { Geolocation } from '@capacitor/geolocation';
         const BackgroundGeolocation = registerPlugin('BackgroundGeolocation');
 
-        // 3. Configuração do Firebase
-        const firebaseConfig = {
-            apiKey: "AIzaSyBasRvPZxi02C-YQ6IRjqC8JJdazuYRF-A",
-            authDomain: "sos-alvorada-botao.firebaseapp.com",
-            databaseURL: "https://sos-alvorada-botao-default-rtdb.firebaseio.com",
-            projectId: "sos-alvorada-botao",
-            storageBucket: "sos-alvorada-botao.firebasestorage.app",
-            messagingSenderId: "187135078415",
-            appId: "1:187135078415:web:11db12917a4d4e091db37a"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
-
+        // URL Direta para a API REST do Firebase (substitui o SDK pesado)
+        const FIREBASE_REST_URL = "https://sos-alvorada-botao-default-rtdb.firebaseio.com/ocorrencias/";
         const WHATSAPP_NUMBER = "5551989670061";
         
         let watcherId = null;
@@ -147,11 +131,11 @@
             try {
                 watcherId = await BackgroundGeolocation.addWatcher(
                     {
-                        backgroundMessage: "A transmitir localização em segundo plano.",
+                        backgroundMessage: "A transmitir localização em segundo plano para a Guarda Municipal.",
                         backgroundTitle: "Botão Lilás Ativo",
                         requestPermissions: true, 
                         stale: false,
-                        distanceFilter: 5 // A cada 5 metros
+                        distanceFilter: 5 // Atualiza a cada 5 metros
                     },
                     function callback(location, error) {
                         if (error) {
@@ -166,13 +150,14 @@
                         latestLon = location.longitude;
                         latestAcc = location.accuracy.toFixed(0);
 
+                        // Atualiza a tela (se estiver acesa)
                         document.getElementById('val-lat').innerText = latestLat.toFixed(6);
                         document.getElementById('val-lon').innerText = latestLon.toFixed(6);
                         document.getElementById('val-acc').innerText = latestAcc + " metros";
                         document.getElementById('btn-sos').disabled = false;
 
-                        // Motor Oficial do Firebase (Imune ao bloqueio de CORS)
-                        enviarSinalFirebase();
+                        // Dispara a requisição HTTP Nativa
+                        enviarSinalNativo();
                     }
                 );
             } catch (err) {
@@ -181,24 +166,38 @@
             }
         }
 
-        function enviarSinalFirebase() {
+        // 2. O Novo Motor de Envio Invencível (CapacitorHttp)
+        async function enviarSinalNativo() {
             if (!latestLat || !latestLon) return;
 
             const horaAtual = new Date().toLocaleTimeString();
+            const urlFinal = `${FIREBASE_REST_URL}${ocorrenciaUnica}.json`;
             
-            set(ref(db, 'ocorrencias/' + ocorrenciaUnica), {
+            const payload = {
                 latitude: latestLat,
                 longitude: latestLon,
                 precisao: latestAcc,
                 atualizadoEm: horaAtual,
                 status: "ativo"
-            }).then(() => {
+            };
+
+            try {
+                // Envia os dados usando o protocolo nativo do Android, ignorando as restrições do navegador
+                await CapacitorHttp.patch({
+                    url: urlFinal,
+                    headers: { 'Content-Type': 'application/json' },
+                    data: payload
+                });
+
+                // Confirmação visual na tela (se estiver acesa)
                 const syncEl = document.getElementById('sync-time');
                 if (syncEl) {
                     syncEl.style.display = 'inline-block';
                     syncEl.innerText = "Sync: " + horaAtual;
                 }
-            }).catch(error => console.error("Erro no Firebase:", error));
+            } catch (error) {
+                console.error("Erro crítico de envio nativo:", error);
+            }
         }
 
         function dispatchEmergency() {
@@ -207,7 +206,7 @@
             document.getElementById('btn-sos').disabled = true;
             document.getElementById('btn-sos').innerText = "A ENVIAR ALERTA...";
 
-            const mapsUrl = `https://www.google.com/maps?q=${latestLat},${latestLon}`;            
+            const mapsUrl = `https://www.google.com/maps?q=${latestLat},${latestLon}`;
             const messageText = `🚨 *ALERTA BOTÃO LILÁS*\n\nOcorrência: *${ocorrenciaUnica}*\nESTOU EM PERIGO!\n\n📍 *Localização no momento do alerta:*\n${mapsUrl}`;
             
             window.location.href = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(messageText)}`;
